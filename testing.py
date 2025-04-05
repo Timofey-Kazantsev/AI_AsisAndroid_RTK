@@ -11,7 +11,7 @@ from whisper import load_model
 from audio_conv import load_audio_with_ffmpeg
 
 # Конфигурация
-INPUT_FILE = "video.mp4"
+INPUT_FILE = "sampleb.mp3"
 OUTPUT_FILE_BY_SPEAKER = "speakers_phrases.txt"  # Первый файл: по спикерам
 OUTPUT_FILE_BY_TIME = "timeline_phrases.txt"    # Второй файл: по времени
 SAMPLE_RATE = 16000
