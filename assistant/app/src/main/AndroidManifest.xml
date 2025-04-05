@@ -13,6 +13,12 @@
         android:theme="@style/Theme.Assistant"
         tools:targetApi="31">
         <activity
+            android:name=".panel_info"
+            android:exported="false" />
+        <activity
+            android:name=".Info"
+            android:exported="false" />
+        <activity
             android:name=".AddVoice"
             android:exported="false" />
         <activity
