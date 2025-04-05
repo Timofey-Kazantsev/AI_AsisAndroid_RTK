@@ -4,29 +4,20 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 # Конфигурация
 INPUT_FILE = "speakers_phrases.txt"  # Файл с текстом
 OUTPUT_FILE = "summary.txt"  # Файл для пересказа
-MODEL_NAME = "mistralai/Mistral-7B-v0.1"  # Правильное имя модели Mistral-7B
+MODEL_PATH = "D:\Llama"  # Укажите путь к папке с файлами модели
 
 
 def load_model():
     """
-    Загружает модель Mistral-7B и токенизатор.
+    Загружает модель OpenLLaMA и токенизатор из локальной папки.
     """
-    print(f"Загрузка модели {MODEL_NAME}...")
+    print(f"Загрузка модели из {MODEL_PATH}...")
     try:
-        # Передаем токен для доступа к приватным репозиториям
-        model = AutoModelForCausalLM.from_pretrained(
-            MODEL_NAME,
-            torch_dtype=torch.float16,
-            token=HF_TOKEN if HF_TOKEN else None  # Используем токен, если он указан
-        )
-        tokenizer = AutoTokenizer.from_pretrained(
-            MODEL_NAME,
-            token=HF_TOKEN if HF_TOKEN else None
-        )
+        model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, torch_dtype=torch.float16)
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     except Exception as e:
         print(f"Ошибка загрузки модели: {e}")
-        print("Убедитесь, что transformers обновлён: pip install --upgrade transformers")
-        print("Если модель приватная, укажите токен в HF_TOKEN или войдите через huggingface-cli login")
+        print("Убедитесь, что все файлы модели (config.json, pytorch_model.bin, tokenizer.model) находятся в папке.")
         raise
 
     # Переносим модель на GPU, если доступно
@@ -57,7 +48,7 @@ def read_input_file(file_path):
 
 def generate_summary(text, model, tokenizer):
     """
-    Генерирует краткий пересказ текста с помощью Mistral-7B.
+    Генерирует краткий пересказ текста с помощью OpenLLaMA.
     """
     if not text:
         return "Пересказ невозможен: файл пуст или не найден."
