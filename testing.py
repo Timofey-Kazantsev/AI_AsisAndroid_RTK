@@ -4,29 +4,23 @@ from collections import defaultdict
 import warnings
 import torch
 import torchaudio
-from dotenv import load_dotenv
-from pydub import AudioSegment
-import subprocess
-import whisper
 import tempfile
 import numpy as np
-from pyannote.audio import Pipeline
-from pyannote.audio import Model
-from omegaconf import ListConfig  # Для ListConfig
-from omegaconf.base import ContainerMetadata  # Для ContainerMetadata
-
-# Добавляем ListConfig и ContainerMetadata в список безопасных глобальных объектов
-torch.serialization.add_safe_globals([ListConfig, ContainerMetadata])
+from speechbrain.pretrained import SpeakerRecognition
+from whisper import load_model
+from audio_conv import load_audio_with_ffmpeg
 
 # Конфигурация
-INPUT_FILE = "123.ogg"
+INPUT_FILE = "video.mp4"
+OUTPUT_FILE_BY_SPEAKER = "speakers_phrases.txt"  # Первый файл: по спикерам
+OUTPUT_FILE_BY_TIME = "timeline_phrases.txt"    # Второй файл: по времени
 SAMPLE_RATE = 16000
-WHISPER_MODEL = "small"
-MAX_GAP_FOR_MERGE = 0.1  # Максимальный разрыв для объединения сегментов (в секундах)
-SIMILARITY_THRESHOLD = 0.75  # Порог схожести для идентификации спикера
-load_dotenv()
-AUTH_TOKEN = os.environ.get('AUTH_TOKEN') # Ваш токен
-
+BASE_SIMILARITY_THRESHOLD = 0.35
+MERGE_SIMILARITY_THRESHOLD = 0.5
+MIN_SEGMENT_LENGTH = 1.0
+MERGE_THRESHOLD = 0.5
+CONTEXT_WINDOW = 5.0
+WHISPER_MODEL_NAME = "small"
 warnings.filterwarnings("ignore")
 
 
@@ -35,71 +29,63 @@ class SpeakerRecognizer:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Используется устройство: {self.device}")
 
-        # Загрузка pipeline для диаризации из pyannote
-        print("Загрузка модели pyannote.audio...")
-        self.pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization",
-            use_auth_token=AUTH_TOKEN
-        ).to(self.device)
-
-        self.pipeline.instantiate({
-            "clustering": {
-                "method": "centroid",
-                "threshold": 0.7,  # Порог кластеризации
-            }
-        })
-
-        # Загрузка модели для извлечения эмбеддингов
-        print("Загрузка модели эмбеддингов...")
-        self.embedding_model = Model.from_pretrained(
-            "pyannote/embedding",
-            use_auth_token=AUTH_TOKEN
-        ).to(self.device)
+        print("Загрузка модели SpeechBrain...")
+        self.embedding_model = SpeakerRecognition.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb")
 
         print("Загрузка модели Whisper...")
-        self.whisper_model = whisper.load_model(WHISPER_MODEL, device=self.device)
+        self.whisper_model = load_model(WHISPER_MODEL_NAME)
 
-        # Словарь для хранения эмбеддингов спикеров
         self.speaker_embeddings = {}
+        self.last_speaker_segment = {}
         self.next_speaker_id = 1
 
-    def recognize_speech(self, audio_segment):
+    def recognize_speech_with_timestamps(self, audio_segment):
         try:
             temp_dir = tempfile.mkdtemp()
             temp_path = os.path.join(temp_dir, "temp_audio.wav")
             audio_segment.export(temp_path, format="wav")
-            result = self.whisper_model.transcribe(
-                temp_path,
-                language="ru",
-                fp16=torch.cuda.is_available(),
-                beam_size=5
-            )
+            result = self.whisper_model.transcribe(temp_path, language="ru", word_timestamps=True)
             os.remove(temp_path)
             os.rmdir(temp_dir)
-            return result["text"].strip()
+            return result["segments"]
         except Exception as e:
-            print(f"Ошибка распознавания: {str(e)}")
-            return ""
+            print(f"Ошибка распознавания с временными метками: {str(e)}")
+            return []
+
+    def preprocess_waveform(self, waveform, min_length=16000):
+        if waveform.ndim == 2:
+            waveform = waveform.squeeze(0)
+
+        waveform_length = waveform.shape[-1]
+        target_length = max(waveform_length, min_length)
+        if waveform_length < target_length:
+            padding_length = target_length - waveform_length
+            waveform = torch.nn.functional.pad(waveform, (0, padding_length), mode='constant', value=0)
+
+        waveform = waveform / (torch.max(torch.abs(waveform)) + 1e-8)
+        return waveform
 
     def get_embedding(self, audio_segment):
         try:
             temp_dir = tempfile.mkdtemp()
             temp_path = os.path.join(temp_dir, "temp_audio.wav")
             audio_segment.export(temp_path, format="wav")
+
             waveform, sr = torchaudio.load(temp_path)
-            print(f"Waveform shape: {waveform.shape}, Sample rate: {sr}")
-            if sr != SAMPLE_RATE:
-                waveform = torchaudio.functional.resample(waveform, sr, SAMPLE_RATE)
-            waveform = waveform.to(self.device)
-            if waveform.shape[0] > 1:
-                waveform = torch.mean(waveform, dim=0, keepdim=True)
-            print(f"Processed waveform shape: {waveform.shape}")
-            with torch.no_grad():
-                embedding = self.embedding_model({"waveform": waveform.unsqueeze(0), "sample_rate": SAMPLE_RATE})
-            embedding_np = embedding.cpu().numpy()
             os.remove(temp_path)
             os.rmdir(temp_dir)
-            return embedding_np
+
+            if sr != SAMPLE_RATE:
+                waveform = torchaudio.functional.resample(waveform, sr, SAMPLE_RATE)
+
+            waveform = self.preprocess_waveform(waveform, min_length=int(SAMPLE_RATE * MIN_SEGMENT_LENGTH))
+            waveform = waveform.unsqueeze(0)
+            print(f"Prepared waveform shape for embedding: {waveform.shape}")
+
+            with torch.no_grad():
+                embedding = self.embedding_model.encode_batch(waveform)
+                return embedding.squeeze(0).cpu().numpy()
+
         except Exception as e:
             print(f"Ошибка получения эмбеддинга: {str(e)}")
             return None
@@ -107,112 +93,149 @@ class SpeakerRecognizer:
     def cosine_similarity(self, emb1, emb2):
         if emb1 is None or emb2 is None:
             return 0.0
-        emb1 = emb1.flatten()
-        emb2 = emb2.flatten()
+        if emb1.ndim > 1:
+            emb1 = emb1.ravel()
+        if emb2.ndim > 1:
+            emb2 = emb2.ravel()
         return np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
 
-    def identify_speaker(self, embedding):
+    def identify_speaker(self, embedding, segment_duration, text, start_time):
+        threshold = BASE_SIMILARITY_THRESHOLD if segment_duration >= 1.0 else 0.25
+
         if embedding is None:
             spk_id = f"SPEAKER_{self.next_speaker_id}"
             self.next_speaker_id += 1
+            self.speaker_embeddings[spk_id] = []
+            self.last_speaker_segment[spk_id] = start_time
+            print(f"Создан новый спикер (нет эмбеддинга): {spk_id} (длительность: {segment_duration:.2f} сек, текст: '{text}')")
             return spk_id
 
+        if not self.speaker_embeddings:
+            spk_id = f"SPEAKER_{self.next_speaker_id}"
+            self.next_speaker_id += 1
+            self.speaker_embeddings[spk_id] = [embedding]
+            self.last_speaker_segment[spk_id] = start_time
+            print(f"Создан первый спикер: {spk_id} (длительность: {segment_duration:.2f} сек, текст: '{text}')")
+            return spk_id
+
+        best_score = -1
+        best_speaker = None
+
         for spk_id, emb_list in self.speaker_embeddings.items():
+            if not emb_list:
+                continue
             avg_embedding = np.mean(emb_list, axis=0)
             similarity = self.cosine_similarity(embedding, avg_embedding)
-            print(f"Сравнение с {spk_id}: сходство = {similarity:.3f}")
-            if similarity > SIMILARITY_THRESHOLD:
-                self.speaker_embeddings[spk_id].append(embedding)
-                return spk_id
+            time_diff = start_time - self.last_speaker_segment.get(spk_id, float('inf'))
+            print(f"Сравнение с {spk_id}: сходство = {similarity:.3f}, разница времени = {time_diff:.2f} сек (длительность: {segment_duration:.2f} сек, текст: '{text}')")
 
-        spk_id = f"SPEAKER_{self.next_speaker_id}"
-        self.speaker_embeddings[spk_id] = [embedding]
-        self.next_speaker_id += 1
-        print(f"Новый спикер: {spk_id}")
-        return spk_id
+            time_bonus = 0
+            if time_diff <= CONTEXT_WINDOW and time_diff >= 0:
+                time_weight = 0.05 if (segment_duration < 1.0 and len(emb_list) < 2) else (0.1 if len(emb_list) >= 3 else 0.2)
+                time_bonus = time_weight * (1 - time_diff / CONTEXT_WINDOW)
+            stability_bonus = min(0.15, len(emb_list) * 0.02)
+            score = similarity + time_bonus + stability_bonus
+
+            print(f"Скор для {spk_id}: сходство = {similarity:.3f}, бонус времени = {time_bonus:.3f}, бонус устойчивости = {stability_bonus:.3f}, итог = {score:.3f}")
+
+            if score > best_score:
+                best_score = score
+                best_speaker = spk_id
+
+        if best_score >= threshold:
+            print(f"Спикер идентифицирован как: {best_speaker} (скор: {best_score:.3f}, длительность: {segment_duration:.2f} сек, текст: '{text}')")
+        else:
+            spk_id = f"SPEAKER_{self.next_speaker_id}"
+            self.next_speaker_id += 1
+            self.speaker_embeddings[spk_id] = [embedding]
+            self.last_speaker_segment[spk_id] = start_time
+            print(f"Создан новый спикер: {spk_id} (скор с лучшим: {best_score:.3f}, длительность: {segment_duration:.2f} сек, текст: '{text}')")
+            return spk_id
+
+        self.speaker_embeddings[best_speaker].append(embedding)
+        self.last_speaker_segment[best_speaker] = start_time
+        return best_speaker
 
 
-def load_audio_with_ffmpeg(voice_file, ffmpeg_path="ffmpeg"):
-    process = subprocess.Popen(
-        [
-            ffmpeg_path,
-            "-loglevel", "quiet",
-            "-i", voice_file,
-            "-ar", str(SAMPLE_RATE),
-            "-ac", "1",
-            "-f", "s16le",
-            "-"
-        ],
-        stdout=subprocess.PIPE
-    )
-    raw_audio = process.communicate()[0]
-    audio_segment = AudioSegment(
-        data=raw_audio,
-        sample_width=2,
-        frame_rate=SAMPLE_RATE,
-        channels=1
-    )
-    return audio_segment
+def merge_short_segments(audio, segments, recognizer):
+    merged_segments = []
+    current_segment = None
+
+    for segment in segments:
+        duration = segment["end"] - segment["start"]
+        start_ms = segment["start"] * 1000
+        end_ms = segment["end"] * 1000
+        text = segment["text"].strip()
+
+        if current_segment is None:
+            current_segment = {
+                "start": segment["start"],
+                "end": segment["end"],
+                "text": text,
+                "embedding": recognizer.get_embedding(audio[int(start_ms):int(end_ms)])
+            }
+        else:
+            seg_audio = audio[int(start_ms):int(end_ms)]
+            embedding = recognizer.get_embedding(seg_audio)
+            similarity = recognizer.cosine_similarity(current_segment["embedding"], embedding)
+            print(f"Проверка объединения: сходство = {similarity:.3f}, текущий текст: '{text}', длительность: {duration:.2f} сек")
+
+            if duration < MERGE_THRESHOLD and similarity >= MERGE_SIMILARITY_THRESHOLD:
+                current_segment["end"] = segment["end"]
+                current_segment["text"] += " " + text
+                print(f"Объединено с предыдущим: новый текст: '{current_segment['text']}'")
+            else:
+                merged_segments.append(current_segment)
+                current_segment = {
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "text": text,
+                    "embedding": embedding
+                }
+
+    if current_segment:
+        merged_segments.append(current_segment)
+
+    for seg in merged_segments:
+        del seg["embedding"]
+
+    return merged_segments
 
 
 def process_audio(file_path, recognizer):
     try:
-        audio = load_audio_with_ffmpeg(file_path).normalize()
-        temp_dir = tempfile.mkdtemp()
-        temp_wav = os.path.join(temp_dir, "temp.wav")
-        audio.export(temp_wav, format="wav")
+        audio = load_audio_with_ffmpeg(file_path, SAMPLE_RATE, channels=1).normalize()
+        print("Выполняется распознавание речи с временными метками...")
+        segments = recognizer.recognize_speech_with_timestamps(audio)
 
-        diarization = recognizer.pipeline(temp_wav)
+        segments = merge_short_segments(audio, segments, recognizer)
+
         results = []
         speaker_texts = defaultdict(list)
-        speaker_map = {}
 
-        raw_segments = []
-        for turn, _, speaker in diarization.itertracks(yield_label=True):
-            if speaker not in speaker_map:
-                speaker_map[speaker] = f"TEMP_{len(speaker_map) + 1}"
-            start = turn.start
-            end = turn.end
-            duration = end - start
-            spk_id = speaker_map[speaker]
-            raw_segments.append({
+        for segment in segments:
+            start = segment["start"] * 1000
+            end = segment["end"] * 1000
+            text = segment["text"].strip()
+            duration = (end - start) / 1000
+
+            if not text or duration < 0.2:
+                continue
+
+            seg_audio = audio[int(start):int(end)]
+            embedding = recognizer.get_embedding(seg_audio)
+            spk_id = recognizer.identify_speaker(embedding, duration, text, segment["start"])
+
+            results.append({
                 "speaker": spk_id,
-                "start": start,
-                "end": end,
+                "start": start / 1000,
+                "end": end / 1000,
+                "text": text,
                 "duration": duration
             })
-
-        if raw_segments:
-            current = raw_segments[0]
-            for next_seg in raw_segments[1:]:
-                time_gap = next_seg["start"] - current["end"]
-                if current["speaker"] == next_seg["speaker"] and time_gap <= MAX_GAP_FOR_MERGE:
-                    current["end"] = next_seg["end"]
-                    current["duration"] = current["end"] - current["start"]
-                else:
-                    seg = audio[int(current["start"] * 1000):int(current["end"] * 1000)]
-                    embedding = recognizer.get_embedding(seg)
-                    spk_id = recognizer.identify_speaker(embedding)
-                    current["speaker"] = spk_id
-                    text = recognizer.recognize_speech(seg)
-                    current["text"] = text
-                    results.append(current)
-                    if text:
-                        speaker_texts[spk_id].append({"start": current["start"], "text": text})
-                    current = next_seg
-
-            seg = audio[int(current["start"] * 1000):int(current["end"] * 1000)]
-            embedding = recognizer.get_embedding(seg)
-            spk_id = recognizer.identify_speaker(embedding)
-            current["speaker"] = spk_id
-            text = recognizer.recognize_speech(seg)
-            current["text"] = text
-            results.append(current)
             if text:
-                speaker_texts[spk_id].append({"start": current["start"], "text": text})
+                speaker_texts[spk_id].append({"start": start / 1000, "text": text})
 
-        os.remove(temp_wav)
-        os.rmdir(temp_dir)
         return results, speaker_texts
 
     except Exception as e:
@@ -220,20 +243,35 @@ def process_audio(file_path, recognizer):
         return [], {}
 
 
+def save_by_speaker(speaker_texts, output_file):
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("Распознанный текст по спикерам:\n")
+        for speaker, texts in sorted(speaker_texts.items()):
+            f.write(f"\n{speaker}:\n")
+            for entry in texts:
+                f.write(f"[{timedelta(seconds=int(entry['start']))}] {entry['text']}\n")
+    print(f"Результаты сохранены в файл (по спикерам): {output_file}")
+
+
+def save_by_time(results, output_file):
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("Распознанный текст по времени:\n\n")
+        # Сортируем результаты по времени начала
+        sorted_results = sorted(results, key=lambda x: x["start"])
+        for seg in sorted_results:
+            f.write(f"[{timedelta(seconds=int(seg['start']))}] {seg['speaker']}: {seg['text']}\n")
+    print(f"Результаты сохранены в файл (по времени): {output_file}")
+
+
 def print_results(results, speaker_texts):
     if not results:
         print("Нет результатов для отображения")
         return
 
-    print("\nРезультаты диаризации:")
-    speaker_stats = defaultdict(float)
-    for i, seg in enumerate(results, 1):
-        speaker_stats[seg["speaker"]] += seg["duration"]
-        print(f"{i:3d}. {seg['speaker']:12s}: {timedelta(seconds=int(seg['start']))} - {timedelta(seconds=int(seg['end']))} ({seg['duration']:.1f} сек)")
-
-    print("\nОбщее время речи по спикерам:")
-    for speaker, duration in sorted(speaker_stats.items(), key=lambda x: x[1], reverse=True):
-        print(f"- {speaker:12s}: {timedelta(seconds=int(duration))}")
+    print("\nРезультаты диаризации по предложениям:")
+    for seg in results:
+        print(f"{seg['speaker']}: {timedelta(seconds=int(seg['start']))} - {timedelta(seconds=int(seg['end']))} "
+              f"({seg['text']}) [длительность: {seg['duration']:.2f} сек]")
 
     print("\nРаспознанный текст по спикерам:")
     for speaker, texts in sorted(speaker_texts.items()):
@@ -249,6 +287,8 @@ def main():
     results, speaker_texts = process_audio(INPUT_FILE, recognizer)
     if results:
         print_results(results, speaker_texts)
+        save_by_speaker(speaker_texts, OUTPUT_FILE_BY_SPEAKER)
+        save_by_time(results, OUTPUT_FILE_BY_TIME)
     else:
         print("Не удалось обнаружить речевые сегменты")
 
