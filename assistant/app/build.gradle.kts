@@ -46,7 +46,7 @@ android {
 
 dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
-    implementation(libs.appcompat)
+    implementation ("com.arthenica:ffmpeg-kit-full:6.0")
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
@@ -58,14 +58,12 @@ dependencies {
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
 
+
     // Для Google Calendar API
     implementation("com.google.api-client:google-api-client:2.0.0")
     implementation("com.google.apis:google-api-services-calendar:v3-rev20220715-2.0.0")
     implementation("com.google.http-client:google-http-client-gson:1.42.0")
 
-    // Для Firebase Firestore
-    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
-    implementation("com.google.firebase:firebase-firestore-ktx")
 
     // Для работы с сетью (Ktor)
     implementation("io.ktor:ktor-client-android:2.3.0")

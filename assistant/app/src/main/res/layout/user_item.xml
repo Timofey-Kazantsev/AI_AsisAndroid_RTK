@@ -1,22 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:gravity="center"
     android:padding="16dp">
 
-    <Button
-        android:id="@+id/signInButton"
+    <TextView
+        android:id="@+id/emailTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/sign_in_with_google" />
+        android:text="Email"
+        android:textStyle="bold"/>
 
-    <Button
-        android:id="@+id/usersButton"
+    <TextView
+        android:id="@+id/nameTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Показать пользователей"/>
-
-
+        android:text="Display Name"/>
 </LinearLayout>

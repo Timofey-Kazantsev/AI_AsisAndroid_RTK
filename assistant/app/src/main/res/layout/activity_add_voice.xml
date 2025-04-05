@@ -28,7 +28,7 @@
         app:layout_constraintHorizontal_bias="0.501"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/imageView"
-        app:layout_constraintVertical_bias="1.0"
+        app:layout_constraintVertical_bias="0.388"
         app:srcCompat="@drawable/image" />
 
     <Button
@@ -43,6 +43,16 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@+id/imageView3"
         app:layout_constraintVertical_bias="0.253" />
+
+    <Button
+        android:id="@+id/button_stop_record_voice"
+        android:layout_width="185dp"
+        android:layout_height="70dp"
+        android:backgroundTint="#ff0000"
+        android:text="Остановить запись"
+        android:textSize="18sp"
+        app:layout_constraintTop_toBottomOf="@+id/button_record_voice"/>
+
 
     <Button
         android:id="@+id/button_record_video"

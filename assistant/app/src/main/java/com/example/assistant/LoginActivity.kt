@@ -1,5 +1,6 @@
 package com.example.assistant
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -9,6 +10,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
 import com.google.firebase.database.FirebaseDatabase
 
 class LoginActivity : AppCompatActivity() {
@@ -30,6 +32,11 @@ class LoginActivity : AppCompatActivity() {
 
                 // Сохраняем пользователя в Realtime Database
                 saveUserToRealtimeDatabase(email, displayName)
+                //Переход на страницу загрузки файлов
+                val intent = Intent(this, AddVoice::class.java)
+                startActivity(intent)
+                finish()
+
             } catch (e: ApiException) {
                 Log.e("GoogleSignIn", "❌ Sign-in failed! Status code: ${e.statusCode}, Message: ${e.message}")
 
@@ -67,7 +74,15 @@ class LoginActivity : AppCompatActivity() {
             val signInIntent = googleSignInClient.signInIntent
             signInLauncher.launch(signInIntent)
         }
+
+        val usersButton = findViewById<Button>(R.id.usersButton)
+        usersButton.setOnClickListener {
+            startActivity(Intent(this, UsersActivity::class.java))
+        }
+
+
     }
+
 
     private fun saveUserToRealtimeDatabase(email: String?, displayName: String?) {
         if (email == null || displayName == null) {
@@ -89,5 +104,8 @@ class LoginActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 Log.e("RealtimeDB", "❌ Ошибка сохранения: ${e.message}")
             }
+
     }
+
+
 }
