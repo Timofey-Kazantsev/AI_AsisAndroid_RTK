@@ -13,6 +13,9 @@
         android:theme="@style/Theme.Assistant"
         tools:targetApi="31">
         <activity
+            android:name=".Registration"
+            android:exported="false" />
+        <activity
             android:name=".AddVoice"
             android:exported="false"
             android:theme="@style/Theme.Assistant" />
