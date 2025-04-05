@@ -1,6 +1,9 @@
 package com.example.assistant;
 
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -19,6 +22,34 @@ public class Registration extends AppCompatActivity {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
+        });
+
+
+        // Находим кнопку по ID
+        Button startButton = findViewById(R.id.entrance_button);
+
+        // Устанавливаем обработчик нажатия
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Создаем Intent для перехода на AddVoiceActivity
+                Intent intent = new Intent(Registration.this, Entrance.class);
+                startActivity(intent);
+            }
+        });
+
+        // Находим кнопку по ID
+        Button sendButton = findViewById(R.id.button_send_registration);
+
+        // Устанавливаем обработчик нажатия
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Создаем Intent для перехода на AddVoiceActivity
+                Intent intent = new Intent(Registration.this, Entrance.class); // поменять страницу для перехода
+
+                startActivity(intent);
+            }
         });
     }
 }
