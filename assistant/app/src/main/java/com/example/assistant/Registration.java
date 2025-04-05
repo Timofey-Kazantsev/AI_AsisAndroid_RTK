@@ -11,31 +11,45 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-public class MainActivity extends AppCompatActivity {
+public class Registration extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_main);
-
+        setContentView(R.layout.activity_registration);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
 
+
         // Находим кнопку по ID
-        Button startButton = findViewById(R.id.button_start);
+        Button startButton = findViewById(R.id.entrance_button);
 
         // Устанавливаем обработчик нажатия
- //       startButton.setOnClickListener(new View.OnClickListener() {
-/*            @Override
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
             public void onClick(View v) {
                 // Создаем Intent для перехода на AddVoiceActivity
-                Intent intent = new Intent(MainActivity.this, Registration.class);
+                Intent intent = new Intent(Registration.this, Entrance.class);
                 startActivity(intent);
-            }*/
- //       });
+            }
+        });
+
+        // Находим кнопку по ID
+        Button sendButton = findViewById(R.id.button_send_registration);
+
+        // Устанавливаем обработчик нажатия
+        startButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // Создаем Intent для перехода на AddVoiceActivity
+                Intent intent = new Intent(Registration.this, Entrance.class); // поменять страницу для перехода
+
+                startActivity(intent);
+            }
+        });
     }
 }
