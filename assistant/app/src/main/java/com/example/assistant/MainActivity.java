@@ -29,13 +29,13 @@ public class MainActivity extends AppCompatActivity {
         Button startButton = findViewById(R.id.button_start);
 
         // Устанавливаем обработчик нажатия
-        startButton.setOnClickListener(new View.OnClickListener() {
-            @Override
+ //       startButton.setOnClickListener(new View.OnClickListener() {
+/*            @Override
             public void onClick(View v) {
                 // Создаем Intent для перехода на AddVoiceActivity
                 Intent intent = new Intent(MainActivity.this, AddVoice.class);
                 startActivity(intent);
-            }
-        });
+            }*/
+ //       });
     }
 }
