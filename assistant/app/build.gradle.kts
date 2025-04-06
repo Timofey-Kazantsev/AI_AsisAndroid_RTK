@@ -47,6 +47,10 @@ android {
 dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     implementation ("com.arthenica:ffmpeg-kit-full:6.0")
+    // 📩 Для работы с почтой через SMTP (JavaMail API для Android)
+    implementation("com.sun.mail:android-mail:1.6.2")
+    implementation("com.sun.mail:android-activation:1.6.2")
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
