@@ -33,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
 /*            @Override
             public void onClick(View v) {
                 // Создаем Intent для перехода на AddVoiceActivity
-                Intent intent = new Intent(MainActivity.this, Registration.class);
+                Intent intent = new Intent(MainActivity.this, AddVoice.class);
                 startActivity(intent);
             }*/
  //       });

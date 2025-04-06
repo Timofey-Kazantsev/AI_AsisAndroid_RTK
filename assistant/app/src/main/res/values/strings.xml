@@ -7,6 +7,9 @@
     <string name="previous">Previous</string>
     <string name="google_client_id">911896395542-bugpph8bklhul1jhahbpid7e5ms3kq5l.apps.googleusercontent.com</string>
 
+    <string name="logo_description">Логотип приложения</string>
+
+
     <string name="lorem_ipsum">
         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam in scelerisque sem. Mauris
         volutpat, dolor id interdum ullamcorper, risus dolor egestas lectus, sit amet mattis purus

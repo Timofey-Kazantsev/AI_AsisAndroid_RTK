@@ -1,28 +1,25 @@
 package com.example.assistant;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
+import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.ArrayAdapter;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.widget.ImageButton;
+
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
-public class Panel_info extends AppCompatActivity {
+public class Tasks extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        setContentView(R.layout.activity_panel_info);
+        setContentView(R.layout.activity_tasks);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -30,23 +27,7 @@ public class Panel_info extends AppCompatActivity {
             return insets;
         });
 
-        // Кнопка "Краткий пересказ"
-        findViewById(R.id.button).setOnClickListener(v -> {
-            showModal("Краткий пересказ", "Это пример текста для краткого пересказа.");
-        });
 
-        // Находим кнопку по ID
-        Button startButton = findViewById(R.id.button_tasks);
-
-        // Устанавливаем обработчик нажатия
-        startButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Создаем Intent для перехода на AddVoiceActivity
-                Intent intent = new Intent(Panel_info.this, Tasks.class);
-                startActivity(intent);
-            }
-        });
 
         // Контейнер для динамических элементов
         LinearLayout spinnerContainer = findViewById(R.id.spinnerContainer); // Контейнер для динамических элементов
@@ -76,14 +57,5 @@ public class Panel_info extends AppCompatActivity {
             // Добавляем строку в контейнер
             spinnerContainer.addView(rowLayout);
         }
-    }
-
-    // Метод для отображения модального окна
-    private void showModal(String title, String message) {
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton("Закрыть", (dialog, which) -> dialog.dismiss())
-                .show();
     }
 }
