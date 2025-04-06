@@ -271,7 +271,6 @@ public class AddVoice extends AppCompatActivity {
             return;
         }
 
-        // Проверка подключения к интернету
         ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
         if (activeNetwork == null || !activeNetwork.isConnected()) {
@@ -283,8 +282,8 @@ public class AddVoice extends AppCompatActivity {
             Log.d("FileUpload", "🚀 Отправка файла: " + file.getAbsolutePath() + ", размер: " + file.length() + " байт");
             HttpURLConnection connection = null;
             try {
-                // Настройка соединения
-                URL serverUrl = new URL("http://hack.t-donstu.ru:8000/transcribe-audio");
+                // Первый запрос: отправка файла
+                URL serverUrl = new URL("http://hack.t-donstu.ru:8000/transcribe"); // Убедитесь, что URL правильный
                 connection = (HttpURLConnection) serverUrl.openConnection();
                 connection.setRequestMethod("POST");
                 String boundary = "---------------------------14737809831466499882746641449";
@@ -293,22 +292,18 @@ public class AddVoice extends AppCompatActivity {
                 connection.setConnectTimeout(15000);
                 connection.setReadTimeout(15000);
 
-                // Определение MIME-типа
                 String mimeType = getMimeType(file);
                 if (mimeType == null) {
-                    mimeType = "application/octet-stream"; // Запасной вариант
+                    mimeType = "application/octet-stream";
                 }
                 Log.d("FileUpload", "MIME-тип файла: " + mimeType);
 
-                // Отправка данных
                 DataOutputStream dos = new DataOutputStream(connection.getOutputStream());
-
                 dos.writeBytes("--" + boundary + "\r\n");
                 dos.writeBytes("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n");
                 dos.writeBytes("Content-Type: " + mimeType + "\r\n");
                 dos.writeBytes("\r\n");
 
-                // Запись содержимого файла
                 FileInputStream fis = new FileInputStream(file);
                 byte[] buffer = new byte[1024];
                 int bytesRead;
@@ -330,6 +325,9 @@ public class AddVoice extends AppCompatActivity {
                     responseMessage = readStreamToString(inputStream);
                     inputStream.close();
                     handler.post(() -> Log.d("FileUpload", "✅ Файл успешно отправлен, код ответа: " + responseCode + ", ответ: " + responseMessage));
+
+                    // Пересылка JSON на другой API
+                    forwardJsonToAnotherApi(responseMessage);
                 } else {
                     InputStream errorStream = connection.getErrorStream();
                     if (errorStream != null) {
@@ -352,7 +350,55 @@ public class AddVoice extends AppCompatActivity {
         }).start();
     }
 
-    // Вспомогательный метод для чтения InputStream в строку
+    // Метод для пересылки JSON на другой API
+    private void forwardJsonToAnotherApi(String jsonResponse) {
+        HttpURLConnection connection = null;
+        try {
+            // Замените URL на ваш второй API
+            URL apiUrl = new URL("http://hack.t-donstu.ru:8000/extract-tasks"); // Укажите правильный URL
+            connection = (HttpURLConnection) apiUrl.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            connection.setDoOutput(true);
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(15000);
+
+            // Отправка JSON
+            try (DataOutputStream dos = new DataOutputStream(connection.getOutputStream())) {
+                dos.write(jsonResponse.getBytes("UTF-8"));
+                dos.flush();
+            }
+
+            // Получение ответа от второго API
+            int responseCode = connection.getResponseCode();
+            String responseMessage;
+            if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_CREATED) {
+                InputStream inputStream = connection.getInputStream();
+                responseMessage = readStreamToString(inputStream);
+                inputStream.close();
+                handler.post(() -> Log.d("JsonForward", "✅ JSON успешно переслан, код ответа: " + responseCode + ", ответ: " + responseMessage));
+            } else {
+                InputStream errorStream = connection.getErrorStream();
+                if (errorStream != null) {
+                    responseMessage = readStreamToString(errorStream);
+                    errorStream.close();
+                } else {
+                    responseMessage = connection.getResponseMessage();
+                }
+                String finalResponseMessage = responseMessage;
+                handler.post(() -> Log.e("JsonForward", "❌ Ошибка пересылки JSON, код ответа: " + responseCode + ", сообщение: " + finalResponseMessage));
+            }
+
+        } catch (IOException e) {
+            handler.post(() -> Log.e("JsonForward", "❌ Ошибка пересылки JSON: " + e.getMessage()));
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    // Вспомогательные методы
     private String readStreamToString(InputStream inputStream) throws IOException {
         ByteArrayOutputStream result = new ByteArrayOutputStream();
         byte[] buffer = new byte[1024];
@@ -363,7 +409,6 @@ public class AddVoice extends AppCompatActivity {
         return result.toString("UTF-8");
     }
 
-    // Метод для определения MIME-типа по расширению файла
     private String getMimeType(File file) {
         String fileName = file.getName().toLowerCase();
         if (fileName.endsWith(".mp4")) {
@@ -375,9 +420,9 @@ public class AddVoice extends AppCompatActivity {
         } else if (fileName.endsWith(".m4a")) {
             return "audio/mp4";
         } else if (fileName.endsWith(".ogg")) {
-            return "audio/ogg"; // MIME-тип для OGG
+            return "audio/ogg";
         } else {
-            return null; // Если тип неизвестен, вернём null
+            return null;
         }
     }
 }
