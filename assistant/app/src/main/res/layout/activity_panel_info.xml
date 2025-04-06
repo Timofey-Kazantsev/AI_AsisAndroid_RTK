@@ -47,15 +47,16 @@
 
         <!-- Полный -->
         <Button
-            android:id="@+id/button5"
+            android:id="@+id/button_tasks"
             android:layout_width="0dp"
             android:layout_height="55dp"
             android:layout_marginStart="12dp"
             android:layout_weight="1"
-            android:text="Полный"
-            android:textColor="@color/white"
             android:background="@drawable/button_background"
+            android:text="Задачи"
+            android:textColor="@color/white"
             android:textSize="16sp" />
+
     </LinearLayout>
 
     <!-- Контейнер для динамических элементов -->
@@ -72,18 +73,4 @@
         android:background="@drawable/container_background"/>
 
     <!-- Кнопка "Отправить на почту" -->
-    <Button
-        android:id="@+id/button6"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/button_background"
-        android:text="Отправить на почту"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.9" />
 </androidx.constraintlayout.widget.ConstraintLayout>
